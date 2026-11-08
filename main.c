@@ -51,49 +51,58 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "nrf_delay.h"
-#include "boards.h"
+#include "nrf_gpio.h"
 
-void blink_led(uint32_t idx, int times) {
-    for (int i = 0; i < times; i++) {
-        bsp_board_led_on(idx);
-        nrf_delay_ms(500);
-        bsp_board_led_off(idx);
-        nrf_delay_ms(500);
+#define BUTTON_PIN      NRF_GPIO_PIN_MAP(1, 6)
+#define LED_YELLOW      NRF_GPIO_PIN_MAP(0, 6)
+#define LED_RED         NRF_GPIO_PIN_MAP(0, 8)
+#define LED_GREEN       NRF_GPIO_PIN_MAP(1, 9)
+#define LED_BLUE        NRF_GPIO_PIN_MAP(0, 12)
+
+
+const uint32_t leds[4] = {LED_YELLOW, LED_RED, LED_GREEN, LED_BLUE};
+
+void custom_gpio_init(void) {
+    nrf_gpio_cfg_input(BUTTON_PIN, NRF_GPIO_PIN_PULLUP);
+    for (int i = 0; i < 4; i++) {
+        nrf_gpio_cfg_output(leds[i]);
+        nrf_gpio_pin_write(leds[i], 1);
     }
 }
 
+
+void delay_with_button_pause(uint32_t ms) 
+{
+    for (uint32_t i = 0; i < ms; i++) {
+        while (nrf_gpio_pin_read(BUTTON_PIN) != 0) 
+        {
+
+        }
+        nrf_delay_ms(1);
+    }
+}
+
+
 int main(void)
 {
-    bsp_board_init(BSP_INIT_LEDS);
-    
-    int step = 0;
+    custom_gpio_init();
 
+    int sequence[4] = {6, 5, 7, 7}; 
+    
     while (true)
     {
-        switch (step) 
+        for (int color_idx = 0; color_idx < 4; color_idx++) 
         {
-            case 0:
-                blink_led(0, 6);
-                nrf_delay_ms(1000);
-                break;
-            case 1:
-                blink_led(1, 5);
-                nrf_delay_ms(1000);
-                break;
-            case 2:
-                blink_led(2, 7); 
-                nrf_delay_ms(1000);
-                break;
-            case 3:
-                blink_led(3, 7);
-                nrf_delay_ms(2000);
-                break;
+            for (int blink = 0; blink < sequence[color_idx]; blink++) 
+            {
+                nrf_gpio_pin_write(leds[color_idx], 0);
+                delay_with_button_pause(300); 
+                nrf_gpio_pin_write(leds[color_idx], 1);
+                delay_with_button_pause(300); 
+            }
+            delay_with_button_pause(1000); 
         }
-        step++;
-        if (step > 3) 
-        {
-            step = 0;
-        }
+        delay_with_button_pause(1500);
     }
 }
 
