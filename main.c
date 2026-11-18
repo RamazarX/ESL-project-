@@ -51,58 +51,46 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "nrf_delay.h"
-#include "nrf_gpio.h"
+#include "nrf_drv_clock.h"
+#include "app_usbd.h"
+#include "ControllerLed.h"
+#include "swByButton.h"
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
+#include "nrf_log_default_backends.h"
 
-#define BUTTON_PIN      NRF_GPIO_PIN_MAP(1, 6)
-#define LED_YELLOW      NRF_GPIO_PIN_MAP(0, 6)
-#define LED_RED         NRF_GPIO_PIN_MAP(0, 8)
-#define LED_GREEN       NRF_GPIO_PIN_MAP(1, 9)
-#define LED_BLUE        NRF_GPIO_PIN_MAP(0, 12)
+volatile uint32_t uptime_ms = 0;
 
-
-const uint32_t leds[4] = {LED_YELLOW, LED_RED, LED_GREEN, LED_BLUE};
-
-void custom_gpio_init(void) {
-    nrf_gpio_cfg_input(BUTTON_PIN, NRF_GPIO_PIN_PULLUP);
-    for (int i = 0; i < 4; i++) {
-        nrf_gpio_cfg_output(leds[i]);
-        nrf_gpio_pin_write(leds[i], 1);
-    }
-}
-
-
-void delay_with_button_pause(uint32_t ms) 
+static void setup_lfclk(void)
 {
-    for (uint32_t i = 0; i < ms; i++) {
-        while (nrf_gpio_pin_read(BUTTON_PIN) != 0) 
-        {
+    ret_code_t status = nrf_drv_clock_init();
+    APP_ERROR_CHECK(status);
 
-        }
-        nrf_delay_ms(1);
+    nrf_drv_clock_lfclk_request(NULL);
+    while (!nrf_drv_clock_lfclk_is_running())
+    {
     }
 }
-
 
 int main(void)
 {
-    custom_gpio_init();
-
-    int sequence[4] = {6, 5, 7, 7}; 
-    
+    setup_lfclk();
+    ret_code_t status = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(status);
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+    button_init();
+    leds_init();
+    NRF_LOG_INFO("DoubleClick button start/pause.");
     while (true)
     {
-        for (int color_idx = 0; color_idx < 4; color_idx++) 
+        while (app_usbd_event_queue_process())
         {
-            for (int blink = 0; blink < sequence[color_idx]; blink++) 
-            {
-                nrf_gpio_pin_write(leds[color_idx], 0);
-                delay_with_button_pause(300); 
-                nrf_gpio_pin_write(leds[color_idx], 1);
-                delay_with_button_pause(300); 
-            }
-            delay_with_button_pause(1000); 
+            ;
         }
-        delay_with_button_pause(1500);
+        leds_process(button_is_playing());
+        NRF_LOG_PROCESS();
+        nrf_delay_ms(5);
+        uptime_ms += 5;
     }
 }
 
